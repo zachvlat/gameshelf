@@ -15,11 +15,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
@@ -27,6 +28,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -40,6 +42,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -48,10 +51,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -87,18 +95,32 @@ fun HomeScreen(
     onGameClick: (GameInfo) -> Unit = {}
 ) {
     val totalGames = games.values.sumOf { it.size }
-    val loggedInStores = games.filter { it.value.isNotEmpty() }.keys
     val nowPlayingList = library.nowPlaying
     var editingNp by remember { mutableStateOf<NowPlayingInfo?>(null) }
     var editSliderValue by remember { mutableFloatStateOf(0f) }
     var showSearchSheet by remember { mutableStateOf(false) }
+    var randomGame by remember { mutableStateOf<GameInfo?>(null) }
+
+    val allGamesList = remember(games) { games.values.flatten() }
+
+    val sortedStores = remember(games) {
+        stores.sortedByDescending { games[it.store]?.size ?: 0 }
+    }
+
+    val storeListState = rememberLazyListState()
+
+    LaunchedEffect(sortedStores) {
+        storeListState.scrollToItem(0)
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 8.dp)
         ) {
-        Spacer(Modifier.height(48.dp))
+        Spacer(Modifier.height(16.dp))
 
         Text(
             "My game library:",
@@ -108,18 +130,86 @@ fun HomeScreen(
 
         Spacer(Modifier.height(4.dp))
 
-        if (totalGames > 0) {
-            Text(
-                "$totalGames games across ${loggedInStores.size} store${if (loggedInStores.size != 1) "s" else ""}",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        } else {
-            Text(
-                "No games synced yet",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+        Text(
+            "Total games: $totalGames",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(Modifier.height(16.dp))
+
+        LazyRow(
+            state = storeListState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .drawWithContent {
+                    drawContent()
+                    drawRect(
+                        brush = Brush.horizontalGradient(
+                            colorStops = arrayOf(
+                                0f to Color.Black,
+                                0.94f to Color.Black,
+                                1f to Color.Transparent
+                            ),
+                            startX = 0f,
+                            endX = size.width
+                        ),
+                        blendMode = BlendMode.DstIn
+                    )
+                },
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(sortedStores, key = { it.store.name }) { entry ->
+                StoreCard(
+                    label = entry.label,
+                    count = games[entry.store]?.size ?: 0,
+                    iconRes = entry.iconRes
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            FilledTonalButton(
+                onClick = { randomGame = allGamesList.randomOrNull() }
+            ) {
+                Text("Pick a random game")
+            }
+
+            val picked = randomGame
+            if (picked != null) {
+                Spacer(Modifier.height(16.dp))
+                Column(
+                    modifier = Modifier.clickable { onGameClick(picked) },
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    if (picked.artCover != null) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(picked.artCover)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = picked.title,
+                            modifier = Modifier
+                                .width(120.dp)
+                                .aspectRatio(2f / 3f)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                        Spacer(Modifier.height(8.dp))
+                    }
+                    Text(
+                        text = picked.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
         }
 
         if (nowPlayingList.isNotEmpty()) {
@@ -145,23 +235,6 @@ fun HomeScreen(
                     }
                 )
                 Spacer(Modifier.height(8.dp))
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(stores, key = { it.store.name }) { entry ->
-                StoreCard(
-                    label = entry.label,
-                    count = games[entry.store]?.size ?: 0,
-                    iconRes = entry.iconRes
-                )
             }
         }
     }
@@ -380,33 +453,37 @@ private fun StoreCard(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
         ),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .width(148.dp)
+            .height(64.dp)
     ) {
-        Column(
+        Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f)
-                .padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+                .fillMaxSize()
+                .padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 painter = painterResource(iconRes),
                 contentDescription = label,
-                modifier = Modifier.size(32.dp),
+                modifier = Modifier.size(28.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = "$count",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.primary
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "$count",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
         }
     }
 }
