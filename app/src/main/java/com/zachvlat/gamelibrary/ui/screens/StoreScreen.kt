@@ -190,11 +190,45 @@ fun StoreScreen(
                 ) {
                     item(span = { GridItemSpan(3) }) {
                         if (store == Store.MANUAL) {
-                            FilledTonalButton(
-                                onClick = onAddGame,
-                                modifier = Modifier.fillMaxWidth()
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Text("Add game")
+                                FilledTonalButton(
+                                    onClick = onAddGame,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Add game")
+                                }
+                                FilledTonalButton(
+                                    onClick = {
+                                        scope.launch {
+                                            isSyncing = true
+                                            statusMessage = null
+                                            try {
+                                                val result = library.getGamesForStore(
+                                                    Store.MANUAL,
+                                                    forceRefresh = true
+                                                )
+                                                onGamesUpdated(result)
+                                            } catch (e: Exception) {
+                                                statusMessage = "Error: ${e.message}"
+                                            }
+                                            isSyncing = false
+                                        }
+                                    },
+                                    enabled = !isSyncing,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    if (isSyncing) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.height(20.dp),
+                                            strokeWidth = 2.dp
+                                        )
+                                    } else {
+                                        Text("Fetch metadata")
+                                    }
+                                }
                             }
                         } else {
                         FilledTonalButton(

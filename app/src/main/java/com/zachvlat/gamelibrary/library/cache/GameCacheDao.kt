@@ -18,6 +18,9 @@ interface GameCacheDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertGames(games: List<CachedGame>)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertGame(game: CachedGame)
+
     @Query("DELETE FROM cached_games WHERE store = :store")
     suspend fun deleteGamesForStore(store: String)
 

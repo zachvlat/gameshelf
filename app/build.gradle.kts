@@ -1,9 +1,20 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
 }
+
+val envProps = Properties().apply {
+    val envFile = rootProject.file(".env")
+    if (envFile.exists()) {
+        envFile.inputStream().use { load(it) }
+    }
+}
+val twitchClientId = envProps.getProperty("TWITCH_CLIENT_ID") ?: ""
+val twitchClientSecret = envProps.getProperty("TWITCH_CLIENT_SECRET") ?: ""
 
 android {
     namespace = "com.zachvlat.gamelibrary"
@@ -13,10 +24,13 @@ android {
         applicationId = "com.zachvlat.gamelibrary"
         minSdk = 26
         targetSdk = 36
-        versionCode = 19
-        versionName = "4.1.1"
+        versionCode = 20
+        versionName = "4.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "TWITCH_CLIENT_ID", "\"${twitchClientId.replace("\"", "\\\"")}\"")
+        buildConfigField("String", "TWITCH_CLIENT_SECRET", "\"${twitchClientSecret.replace("\"", "\\\"")}\"")
     }
 
     buildTypes {
@@ -32,6 +46,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

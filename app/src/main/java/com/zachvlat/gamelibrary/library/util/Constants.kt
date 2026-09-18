@@ -52,3 +52,8 @@ object UbisoftConstants {
     const val GAMES_ACTIVITY_URL = "https://www.ubisoft.com/en-gb/account/games-activity"
     const val STORE_BASE_URL = "https://store.ubisoft.com"
 }
+
+object IgdbConstants {
+    const val TOKEN_URL = "https://id.twitch.tv/oauth2/token"
+    const val GAMES_API = "https://api.igdb.com/v4/games"
+}

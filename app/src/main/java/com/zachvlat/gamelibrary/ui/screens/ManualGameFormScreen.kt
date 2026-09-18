@@ -70,7 +70,6 @@ fun ManualGameFormScreen(
     var isMacNative by remember { mutableStateOf(existingGame?.isMacNative ?: false) }
 
     var titleError by remember { mutableStateOf(false) }
-    var coverError by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -116,16 +115,9 @@ fun ManualGameFormScreen(
 
             OutlinedTextField(
                 value = artCover,
-                onValueChange = {
-                    artCover = it
-                    coverError = false
-                },
-                label = { Text("Cover URL *") },
+                onValueChange = { artCover = it },
+                label = { Text("Cover URL (optional)") },
                 placeholder = { Text("https://...") },
-                isError = coverError,
-                supportingText = if (coverError) {
-                    { Text("Cover URL is required") }
-                } else null,
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp)
@@ -254,10 +246,6 @@ fun ManualGameFormScreen(
                         titleError = true
                         return@Button
                     }
-                    if (artCover.text.isBlank()) {
-                        coverError = true
-                        return@Button
-                    }
 
                     val genres = genresText.text.split(",")
                         .map { it.trim() }
@@ -272,7 +260,7 @@ fun ManualGameFormScreen(
                         title = title.text.trim(),
                         developer = developer.text.trim().ifBlank { null },
                         description = description.text.trim().ifBlank { null },
-                        artCover = artCover.text.trim(),
+                        artCover = artCover.text.trim().ifBlank { null },
                         artSquare = artSquare.text.trim().ifBlank { null },
                         artLogo = artLogo.text.trim().ifBlank { null },
                         artBackground = artBackground.text.trim().ifBlank { null },

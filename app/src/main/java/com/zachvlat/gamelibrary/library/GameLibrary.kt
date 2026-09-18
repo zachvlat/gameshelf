@@ -2,6 +2,7 @@ package com.zachvlat.gamelibrary.library
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.zachvlat.gamelibrary.BuildConfig
 import com.zachvlat.gamelibrary.library.auth.EncryptedTokenStorage
 import com.zachvlat.gamelibrary.library.auth.TokenStorage
 import com.zachvlat.gamelibrary.library.cache.AppDatabase
@@ -15,6 +16,7 @@ import com.zachvlat.gamelibrary.library.store.epic.EpicStoreClient
 import com.zachvlat.gamelibrary.library.store.gog.GogStoreClient
 import com.zachvlat.gamelibrary.library.store.ea.EaStoreClient
 import com.zachvlat.gamelibrary.library.store.itch.ItchStoreClient
+import com.zachvlat.gamelibrary.library.store.igdb.IgdbClient
 import com.zachvlat.gamelibrary.library.store.manual.ManualStoreClient
 import com.zachvlat.gamelibrary.library.store.steam.SteamStoreClient
 import com.zachvlat.gamelibrary.library.store.ubisoft.UbisoftStoreClient
@@ -45,7 +47,8 @@ class GameLibrary private constructor(
     val itch: ItchStoreClient,
     val ea: EaStoreClient,
     val manual: ManualStoreClient,
-    val ubisoft: UbisoftStoreClient
+    val ubisoft: UbisoftStoreClient,
+    val igdb: IgdbClient
 ) {
     private val npJson = Json { ignoreUnknownKeys = true }
 
@@ -116,6 +119,32 @@ class GameLibrary private constructor(
         Store.UBISOFT to ubisoft
     )
 
+    private val enrichedGames = mutableMapOf<String, GameInfo>()
+
+    suspend fun enrichGame(game: GameInfo): GameInfo {
+        if (!igdb.isConfigured()) return game
+        val key = "${game.store.name}:${game.appName}"
+        enrichedGames[key]?.let { return it }
+        val enriched = try {
+            igdb.enrichOne(game)
+        } catch (_: Exception) {
+            game
+        }
+        enrichedGames[key] = enriched
+        if (enriched != game) {
+            cache.updateGame(enriched)
+        }
+        return enriched
+    }
+
+    private suspend fun fetchAndCache(store: Store, client: StoreClient): List<GameInfo> {
+        val games = client.refreshLibrary()
+        if (games.isEmpty()) return games
+        val enriched = igdb.enrich(games)
+        cache.cacheGames(store, enriched)
+        return enriched
+    }
+
     fun getClient(store: Store): StoreClient = allClients[store]
         ?: throw IllegalArgumentException("Unknown store: $store")
 
@@ -129,8 +158,7 @@ class GameLibrary private constructor(
         for ((store, client) in allClients) {
             try {
                 if (client.isLoggedIn()) {
-                    val games = client.refreshLibrary()
-                    cache.cacheGames(store, games)
+                    val games = fetchAndCache(store, client)
                     result[store] = games
                 }
             } catch (_: Exception) {
@@ -149,9 +177,8 @@ class GameLibrary private constructor(
         }
 
         val client = getClient(store)
-        val games = client.refreshLibrary()
+        val games = fetchAndCache(store, client)
         if (games.isNotEmpty()) {
-            cache.cacheGames(store, games)
             return games
         }
 
@@ -248,7 +275,12 @@ class GameLibrary private constructor(
                 itch = ItchStoreClient(httpClient, tokenStorage),
                 ea = EaStoreClient(httpClient, tokenStorage),
                 manual = ManualStoreClient(cache),
-                ubisoft = UbisoftStoreClient(httpClient, tokenStorage)
+                ubisoft = UbisoftStoreClient(httpClient, tokenStorage),
+                igdb = IgdbClient(
+                    httpClient = httpClient,
+                    clientId = BuildConfig.TWITCH_CLIENT_ID,
+                    clientSecret = BuildConfig.TWITCH_CLIENT_SECRET
+                )
             )
         }
     }

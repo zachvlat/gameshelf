@@ -23,6 +23,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -49,7 +50,12 @@ fun GameScreen(
 ) {
     var showNowPlayingDialog by remember { mutableStateOf(false) }
     var sliderValue by remember { mutableFloatStateOf(0f) }
-    val nowPlayingEntry = library.nowPlaying.find { it.store == game.store && it.appName == game.appName }
+    var displayGame by remember(game) { mutableStateOf(game) }
+    val nowPlayingEntry = library.nowPlaying.find { it.store == displayGame.store && it.appName == displayGame.appName }
+
+    LaunchedEffect(game) {
+        displayGame = library.enrichGame(game)
+    }
 
     Column(
         modifier = Modifier
@@ -62,13 +68,13 @@ fun GameScreen(
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             AsyncImage(
-                model = game.artCover?.let {
+                model = displayGame.artCover?.let {
                     ImageRequest.Builder(LocalContext.current)
                         .data(it)
                         .crossfade(true)
                         .build()
                 },
-                contentDescription = game.title,
+                contentDescription = displayGame.title,
                 modifier = Modifier
                     .width(140.dp)
                     .aspectRatio(2f / 3f)
@@ -80,20 +86,21 @@ fun GameScreen(
                 verticalArrangement = Arrangement.Center
             ) {
                 Text(
-                    text = game.title,
+                    text = displayGame.title,
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold
                 )
-                if (game.developer != null) {
+                val developer = displayGame.developer
+                if (developer != null) {
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        text = game.developer,
+                        text = developer,
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Text(
-                    text = game.store.name,
+                    text = displayGame.store.name,
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -104,23 +111,28 @@ fun GameScreen(
         HorizontalDivider()
         Spacer(Modifier.height(16.dp))
 
-        MetadataRow("Store", game.store.name)
-        if (game.developer != null) MetadataRow("Developer", game.developer)
-        if (game.releaseDate != null) MetadataRow("Release Date", game.releaseDate)
-        if (game.genres != null && game.genres.isNotEmpty()) MetadataRow("Genres", game.genres.joinToString(", "))
-        MetadataRow("Offline Play", if (game.canRunOffline) "Supported" else "Not supported")
-        MetadataRow("Linux", if (game.isLinuxNative) "Native" else "Not supported")
-        MetadataRow("Mac", if (game.isMacNative) "Native" else "Not supported")
-        if (game.storeUrl != null) {
+        MetadataRow("Store", displayGame.store.name)
+        val metadataDeveloper = displayGame.developer
+        if (metadataDeveloper != null) MetadataRow("Developer", metadataDeveloper)
+        val releaseDate = displayGame.releaseDate
+        if (releaseDate != null) MetadataRow("Release Date", releaseDate)
+        val genres = displayGame.genres
+        if (genres != null && genres.isNotEmpty()) MetadataRow("Genres", genres.joinToString(", "))
+        MetadataRow("Offline Play", if (displayGame.canRunOffline) "Supported" else "Not supported")
+        MetadataRow("Linux", if (displayGame.isLinuxNative) "Native" else "Not supported")
+        MetadataRow("Mac", if (displayGame.isMacNative) "Native" else "Not supported")
+        val storeUrl = displayGame.storeUrl
+        if (storeUrl != null) {
             val uriHandler = LocalUriHandler.current
             MetadataRow(
                 "Store URL",
-                game.storeUrl,
-                onClick = { uriHandler.openUri(game.storeUrl) }
+                storeUrl,
+                onClick = { uriHandler.openUri(storeUrl) }
             )
         }
 
-        if (game.description != null) {
+        val description = displayGame.description
+        if (description != null) {
             Spacer(Modifier.height(16.dp))
             HorizontalDivider()
             Spacer(Modifier.height(12.dp))
@@ -131,7 +143,7 @@ fun GameScreen(
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text = game.description,
+                text = description,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -156,7 +168,7 @@ fun GameScreen(
             )
             Spacer(Modifier.height(8.dp))
             OutlinedButton(
-                onClick = { library.removeNowPlaying(game.store, game.appName) },
+                onClick = { library.removeNowPlaying(displayGame.store, displayGame.appName) },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Remove from Now Playing")
@@ -202,7 +214,7 @@ fun GameScreen(
                 TextButton(
                     onClick = {
                         library.updateNowPlaying(
-                            NowPlayingInfo(game.store, game.appName, percent)
+                            NowPlayingInfo(displayGame.store, displayGame.appName, percent)
                         )
                         showNowPlayingDialog = false
                     }

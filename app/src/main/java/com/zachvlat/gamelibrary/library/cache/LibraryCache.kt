@@ -37,6 +37,10 @@ class LibraryCache(private val database: AppDatabase) {
         dao.replaceGamesForStore(store.name, cachedGames)
     }
 
+    suspend fun updateGame(game: GameInfo) {
+        dao.insertGame(game.toCachedGame(System.currentTimeMillis()))
+    }
+
     suspend fun invalidate(store: Store) {
         dao.deleteGamesForStore(store.name)
     }
