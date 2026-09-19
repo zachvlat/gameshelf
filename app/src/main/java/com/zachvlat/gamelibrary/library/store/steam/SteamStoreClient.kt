@@ -49,6 +49,37 @@ class SteamStoreClient(
         tokenStorage.saveToken(store.name, KEY_API_KEY, apiKey)
     }
 
+    suspend fun testApiKey(apiKey: String): SteamKeyTestResult {
+        val cleaned = apiKey.trim()
+        return try {
+            val url = "$STEAM_API_BASE/ISteamUser/GetPlayerSummaries/v0002/"
+            val text = httpClient.get(url) {
+                parameter("key", cleaned)
+                parameter("steamids", "0")
+                parameter("format", "json")
+            }.bodyAsText()
+            if (text.trimStart().startsWith("<")) {
+                if (text.contains("Unauthorized") || text.contains("Forbidden")) {
+                    Log.e(
+                        TAG,
+                        "Steam rejected API key (len=${cleaned.length}, value=${mask(cleaned)}) during key test"
+                    )
+                    SteamKeyTestResult(
+                        ok = false,
+                        message = "Steam rejected this key. Copy it fresh from steamcommunity.com/dev/apikey and paste it — even one wrong character fails."
+                    )
+                } else {
+                    SteamKeyTestResult(ok = false, message = "Steam returned an unexpected page. Try again.")
+                }
+            } else {
+                SteamKeyTestResult(ok = true, message = "Valid key — Steam accepted it.")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Steam key test failed: ${e.message}", e)
+            SteamKeyTestResult(ok = false, message = "Could not reach Steam: ${e.message}")
+        }
+    }
+
     suspend fun getSteamId(): String? {
         return tokenStorage.getToken(store.name, KEY_STEAM_ID)
     }
@@ -116,6 +147,11 @@ class SteamStoreClient(
         }
     }
 
+    private fun mask(value: String): String {
+        if (value.length <= 8) return "****"
+        return value.take(4) + "****" + value.takeLast(4)
+    }
+
     private suspend fun fetchGamesViaApi(): List<GameInfo> {
         return try {
             val apiKey = getApiKey() ?: return emptyList()
@@ -129,7 +165,12 @@ class SteamStoreClient(
             }
             val text = response.bodyAsText()
             if (text.trimStart().startsWith("<")) {
-                val friendly = if (text.contains("Unauthorized")) {
+                val friendly = if (text.contains("Unauthorized") || text.contains("Forbidden")) {
+                    Log.e(
+                        TAG,
+                        "Steam rejected API key (len=${apiKey.length}, value=${mask(apiKey)}) " +
+                            "while fetching games for steamid=$steamId"
+                    )
                     "Steam rejected your API key. Verify it at steamcommunity.com/dev/apikey and re-enter it without extra spaces."
                 } else {
                     "Steam returned an unexpected page instead of your game list. Try syncing again."
@@ -170,3 +211,8 @@ class SteamStoreClient(
         )
     }
 }
+
+data class SteamKeyTestResult(
+    val ok: Boolean,
+    val message: String
+)

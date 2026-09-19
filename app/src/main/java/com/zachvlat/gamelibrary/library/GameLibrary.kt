@@ -33,6 +33,11 @@ import kotlinx.serialization.decodeFromString
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 class GameLibrary private constructor(
     private val httpClient: HttpClient,
@@ -51,6 +56,8 @@ class GameLibrary private constructor(
     val igdb: IgdbClient
 ) {
     private val npJson = Json { ignoreUnknownKeys = true }
+
+    private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     private var _nowPlaying by mutableStateOf(readNowPlaying())
     val nowPlaying: List<NowPlayingInfo> get() = _nowPlaying
@@ -140,9 +147,16 @@ class GameLibrary private constructor(
     private suspend fun fetchAndCache(store: Store, client: StoreClient): List<GameInfo> {
         val games = client.refreshLibrary()
         if (games.isEmpty()) return games
-        val enriched = igdb.enrich(games)
-        cache.cacheGames(store, enriched)
-        return enriched
+        cache.cacheGames(store, games)
+        backgroundScope.launch {
+            val enriched = try {
+                igdb.enrich(games)
+            } catch (_: Exception) {
+                games
+            }
+            cache.cacheGames(store, enriched)
+        }
+        return games
     }
 
     fun getClient(store: Store): StoreClient = allClients[store]
@@ -220,6 +234,7 @@ class GameLibrary private constructor(
     }
 
     fun destroy() {
+        backgroundScope.cancel()
         httpClient.close()
     }
 

@@ -58,6 +58,7 @@ import coil.compose.AsyncImage
 import com.zachvlat.gamelibrary.library.GameLibrary
 import com.zachvlat.gamelibrary.library.model.GameInfo
 import com.zachvlat.gamelibrary.library.model.Store
+import com.zachvlat.gamelibrary.library.store.steam.SteamKeyTestResult
 import com.zachvlat.gamelibrary.library.ui.ItchAutoSyncWebViewDialog
 import com.zachvlat.gamelibrary.library.ui.LoginWebViewDialog
 import kotlinx.coroutines.launch
@@ -96,6 +97,8 @@ fun StoreScreen(
     var showSteamSetupDialog by remember { mutableStateOf(false) }
     var steamApiKeyInput by remember { mutableStateOf("") }
     var steamProfileUrlInput by remember { mutableStateOf("") }
+    var steamKeyTestResult by remember { mutableStateOf<SteamKeyTestResult?>(null) }
+    var isTestingSteamKey by remember { mutableStateOf(false) }
     var showLogoutConfirm by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf<GameInfo?>(null) }
     val scope = rememberCoroutineScope()
@@ -157,6 +160,7 @@ fun StoreScreen(
                         if (store == Store.STEAM) {
                             steamApiKeyInput = ""
                             steamProfileUrlInput = ""
+                            steamKeyTestResult = null
                             showSteamSetupDialog = true
                         } else {
                             scope.launch {
@@ -258,6 +262,7 @@ fun StoreScreen(
                                                 isSyncing = false
                                                 steamApiKeyInput = library.steam.getApiKey() ?: ""
                                                 steamProfileUrlInput = library.steam.getProfileUrl() ?: ""
+                                                steamKeyTestResult = null
                                                 showSteamSetupDialog = true
                                             }
                                         }
@@ -562,6 +567,35 @@ fun StoreScreen(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+                    Spacer(Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(
+                            onClick = {
+                                scope.launch {
+                                    isTestingSteamKey = true
+                                    steamKeyTestResult = null
+                                    steamKeyTestResult = library.steam.testApiKey(steamApiKeyInput)
+                                    isTestingSteamKey = false
+                                }
+                            },
+                            enabled = steamApiKeyInput.isNotBlank() && !isTestingSteamKey
+                        ) {
+                            Text(if (isTestingSteamKey) "Testing…" else "Test API key")
+                        }
+                    }
+                    val testResult = steamKeyTestResult
+                    if (testResult != null) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            testResult.message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (testResult.ok) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.error
+                            }
+                        )
+                    }
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = steamProfileUrlInput,
