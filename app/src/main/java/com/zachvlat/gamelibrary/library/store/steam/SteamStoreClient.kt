@@ -64,7 +64,7 @@ class SteamStoreClient(
     override suspend fun refreshLibrary(): List<GameInfo> {
         if (hasApiKey() && getSteamId() != null) {
             val apiGames = fetchGamesViaApi()
-            if (apiGames != null) {
+            if (apiGames.isNotEmpty()) {
                 cachedGames = apiGames
                 return apiGames
             }
@@ -87,11 +87,14 @@ class SteamStoreClient(
         return steamId
     }
 
-    private suspend fun resolveSteamId(profileUrl: String): String? {
+    private suspend fun resolveSteamId(input: String): String? {
+        val trimmed = input.trim()
+        if (trimmed.isEmpty()) return null
+        if (trimmed.matches(Regex("""7656119\d{10}"""))) {
+            return trimmed
+        }
+        val xmlUrl = buildProfileXmlUrl(trimmed)
         return try {
-            val xmlUrl = profileUrl.replace("/games/?tab=all", "")
-                .replace("/games/", "")
-                .trimEnd('/') + "/?xml=1"
             val response = httpClient.get(xmlUrl)
             val xml = response.bodyAsText()
             val match = """<steamID64>(\d+)</steamID64>""".toRegex().find(xml)
@@ -102,10 +105,21 @@ class SteamStoreClient(
         }
     }
 
-    private suspend fun fetchGamesViaApi(): List<GameInfo>? {
+    private fun buildProfileXmlUrl(input: String): String {
+        return if (input.contains("steamcommunity.com")) {
+            input
+                .replace("/games/?tab=all", "")
+                .replace("/games/", "")
+                .trimEnd('/') + "/?xml=1"
+        } else {
+            "https://steamcommunity.com/id/${input.trim('/')}/?xml=1"
+        }
+    }
+
+    private suspend fun fetchGamesViaApi(): List<GameInfo> {
         return try {
-            val apiKey = getApiKey() ?: return null
-            val steamId = getSteamId() ?: return null
+            val apiKey = getApiKey() ?: return emptyList()
+            val steamId = getSteamId() ?: return emptyList()
             val url = "$STEAM_API_BASE/IPlayerService/GetOwnedGames/v1/"
             val response = httpClient.get(url) {
                 parameter("key", apiKey)
@@ -114,6 +128,14 @@ class SteamStoreClient(
                 parameter("format", "json")
             }
             val text = response.bodyAsText()
+            if (text.trimStart().startsWith("<")) {
+                val friendly = if (text.contains("Unauthorized")) {
+                    "Steam rejected your API key. Verify it at steamcommunity.com/dev/apikey and re-enter it without extra spaces."
+                } else {
+                    "Steam returned an unexpected page instead of your game list. Try syncing again."
+                }
+                throw IllegalStateException(friendly)
+            }
             val apiResponse = Json { ignoreUnknownKeys = true }.decodeFromString<SteamApiGamesResponse>(text)
             val games = apiResponse.response.games ?: emptyList()
             val gameInfos = games.map { it.toGameInfo() }
@@ -121,7 +143,7 @@ class SteamStoreClient(
             gameInfos
         } catch (e: Exception) {
             Log.e(TAG, "Failed to fetch games via Steam API: ${e.message}", e)
-            null
+            throw e
         }
     }
 

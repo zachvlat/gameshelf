@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
@@ -95,6 +96,7 @@ fun StoreScreen(
     var showSteamSetupDialog by remember { mutableStateOf(false) }
     var steamApiKeyInput by remember { mutableStateOf("") }
     var steamProfileUrlInput by remember { mutableStateOf("") }
+    var showLogoutConfirm by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf<GameInfo?>(null) }
     val scope = rememberCoroutineScope()
 
@@ -231,6 +233,10 @@ fun StoreScreen(
                                 }
                             }
                         } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                         FilledTonalButton(
                             onClick = {
                                 when (store) {
@@ -298,7 +304,7 @@ fun StoreScreen(
                                 }
                             },
                             enabled = !isSyncing,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.weight(1f)
                         ) {
                             if (isSyncing) {
                                 CircularProgressIndicator(
@@ -308,6 +314,19 @@ fun StoreScreen(
                             } else {
                                 Text("Sync new games")
                             }
+                        }
+                        FilledTonalButton(
+                            onClick = { showLogoutConfirm = true },
+                            enabled = !isSyncing
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Logout,
+                                contentDescription = "Remove credentials",
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text("Remove")
+                        }
                         }
                         }
                     }
@@ -525,7 +544,7 @@ fun StoreScreen(
             text = {
                 Column {
                     Text(
-                        "Enter your Steam Web API key and profile URL to sync your library.",
+                        "Enter your Steam Web API key and your profile name or URL to sync your library.",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Spacer(Modifier.height(8.dp))
@@ -547,8 +566,8 @@ fun StoreScreen(
                     OutlinedTextField(
                         value = steamProfileUrlInput,
                         onValueChange = { steamProfileUrlInput = it },
-                        label = { Text("Profile URL") },
-                        placeholder = { Text("https://steamcommunity.com/id/yourname") },
+                        label = { Text("Profile name") },
+                        placeholder = { Text("yourname, 7656119... or full profile URL") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -567,6 +586,7 @@ fun StoreScreen(
                                     library.steam.setApiKey(key)
                                     val steamId = library.steam.resolveAndSaveSteamId(profileUrl)
                                     if (steamId != null) {
+                                        isLoggedIn = true
                                         val result = library.getGamesForStore(store, forceRefresh = true)
                                         onGamesUpdated(result)
                                     } else {
@@ -586,6 +606,34 @@ fun StoreScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showSteamSetupDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+    if (showLogoutConfirm) {
+        AlertDialog(
+            onDismissRequest = { showLogoutConfirm = false },
+            title = { Text("Remove credentials") },
+            text = { Text("Sign out of ${store.name} and delete the saved login? The synced library for this store will be removed from the app.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showLogoutConfirm = false
+                    scope.launch {
+                        try {
+                            library.logout(store)
+                            isLoggedIn = false
+                            onGamesUpdated(emptyList())
+                        } catch (e: Exception) {
+                            statusMessage = "Logout failed: ${e.message}"
+                        }
+                    }
+                }) {
+                    Text("Remove")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutConfirm = false }) {
                     Text("Cancel")
                 }
             }
