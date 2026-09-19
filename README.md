@@ -12,9 +12,11 @@
 <br>
 
 <p align="center">
-  <img height="400" height="2995" alt="IMG_20260704_161420" src="https://github.com/user-attachments/assets/c944ee05-eefb-4e5d-8212-04c6846a3c68" />
-  <img height="400" height="3006" alt="IMG_20260704_161441" src="https://github.com/user-attachments/assets/156ae6bb-8c4d-42ef-bae4-cd62e6b7d452" />
-  <img height="400" height="2996" alt="IMG_20260704_161615" src="https://github.com/user-attachments/assets/5447cecc-fcc7-4df9-a0e3-45fd131148c0" />
+<img width="200" alt="1" src="https://github.com/user-attachments/assets/3b73e958-bacc-430c-af98-d6a716891e5b" />
+<img width="200" alt="2" src="https://github.com/user-attachments/assets/9c3bb567-9621-4e7d-a10e-78a91174435c" />
+<img width="200" alt="3" src="https://github.com/user-attachments/assets/a36f9b51-ff6e-4e1b-8484-641968d49d9b" />
+<img width="200" alt="4" src="https://github.com/user-attachments/assets/521b2fa5-1cdb-4c65-b6d8-fd704592707a" />
+
 </p>
 
 
